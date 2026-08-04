@@ -1,124 +1,346 @@
 let budget = 0;
-let expenses = 0;
-let editRow = null;
-let editAmount = 0;
+let expenses = [];
+let editIndex = -1;
 
+const budgetInput = document.getElementById("budgetInput");
 const budgetBtn = document.getElementById("budgetBtn");
+
+const expenseTitle = document.getElementById("expenseTitle");
+const expenseAmount = document.getElementById("expenseAmount");
+const category = document.getElementById("category");
 const expenseBtn = document.getElementById("expenseBtn");
 
-budgetBtn.addEventListener("click", setBudget);
-expenseBtn.addEventListener("click", addExpense);
+const budgetText = document.getElementById("budget");
+const expenseText = document.getElementById("expense");
+const balanceText = document.getElementById("balance");
 
-function setBudget() {
-    budget = Number(document.getElementById("budget").value);
+const expenseTable = document.getElementById("expenseTable");
+const progressBar = document.getElementById("progressBar");
+const warning = document.getElementById("warning");
 
-    if (budget <= 0 || isNaN(budget)) {
-        alert("Please enter a valid budget");
+const search = document.getElementById("search");
+const resetBtn = document.getElementById("resetBtn");
+
+loadData();
+
+budgetBtn.onclick = () => {
+
+    if (budgetInput.value == "") return;
+
+    budget = Number(budgetInput.value);
+
+    saveData();
+
+    render();
+
+    budgetInput.value = "";
+
+};
+
+expenseBtn.onclick = () => {
+
+    const title = expenseTitle.value.trim();
+    const amount = Number(expenseAmount.value);
+    const cat = category.value;
+
+    if (title == "" || amount <= 0) {
+        alert("Enter valid expense.");
         return;
     }
 
-    document.getElementById("totalBudget").innerText = budget;
-    updateBalance();
+    const item = {
+        title,
+        amount,
+        category: cat,
+        date: new Date().toLocaleDateString()
+    };
 
-    document.getElementById("budget").value = "";
-}
+    if (editIndex == -1) {
 
-function addExpense() {
-
-    let title = document.getElementById("title").value.trim();
-    let amount = Number(document.getElementById("amount").value);
-
-    if (title === "" || amount <= 0 || isNaN(amount)) {
-        alert("Please enter title and amount");
-        return;
-    }
-
-    // Update Existing Expense
-    if (editRow) {
-
-        expenses = expenses - editAmount + amount;
-
-        editRow.cells[0].innerText = title;
-        editRow.cells[1].innerText = amount;
-
-        editRow = null;
-        editAmount = 0;
-
-        expenseBtn.innerText = "Check Amount";
+        expenses.push(item);
 
     } else {
 
-        expenses += amount;
+        expenses[editIndex] = item;
 
-        let table = document.getElementById("expenseTable");
+        editIndex = -1;
 
-        let row = table.insertRow();
-
-        row.insertCell(0).innerText = title;
-        row.insertCell(1).innerText = amount;
-
-        row.insertCell(2).innerHTML =
-            `<i class="fa-solid fa-pen-to-square edit-btn"></i>`;
-
-        row.insertCell(3).innerHTML =
-            `<i class="fa-solid fa-trash delete-btn"></i>`;
+        expenseBtn.innerText = "Add Expense";
 
     }
 
-    document.getElementById("totalExpense").innerText = expenses;
+    expenseTitle.value = "";
+    expenseAmount.value = "";
 
-    updateBalance();
+    saveData();
 
-    document.getElementById("title").value = "";
-    document.getElementById("amount").value = "";
+    render();
+
+};
+
+function render() {
+
+    expenseTable.innerHTML = "";
+
+    let totalExpense = 0;
+
+    let keyword = search.value.toLowerCase();
+
+    expenses.forEach((item, index) => {
+
+        totalExpense += item.amount;
+
+        if (!item.title.toLowerCase().includes(keyword)) return;
+
+        expenseTable.innerHTML += `
+<tr>
+
+<td>${item.title}</td>
+
+<td>${item.category}</td>
+
+<td>Rs ${item.amount}</td>
+
+<td>${item.date}</td>
+
+<td>
+
+<button onclick="editExpense(${index})">
+✏️
+</button>
+
+<button onclick="deleteExpense(${index})">
+🗑️
+</button>
+
+</td>
+
+</tr>
+`;
+
+    });
+
+    budgetText.innerText = "Rs " + budget;
+
+    expenseText.innerText = "Rs " + totalExpense;
+
+    balanceText.innerText = "Rs " + (budget - totalExpense);
+
+    let percent = budget > 0 ? (totalExpense / budget) * 100 : 0;
+
+    if (percent > 100) percent = 100;
+
+    progressBar.style.width = percent + "%";
+
+    if (totalExpense > budget) {
+
+        warning.innerText = "⚠ Budget Exceeded";
+
+        progressBar.style.background = "red";
+
+    } else {
+
+        warning.innerText = "";
+
+        progressBar.style.background = "#00ff99";
+
+    }
 
 }
 
-document.getElementById("expenseTable").addEventListener("click", function(e){
+function editExpense(index) {
 
-    let row = e.target.closest("tr");
+    expenseTitle.value = expenses[index].title;
 
-    if(!row) return;
+    expenseAmount.value = expenses[index].amount;
 
-    // Delete
-    if(e.target.classList.contains("delete-btn")){
+    category.value = expenses[index].category;
 
-        let amount = Number(row.cells[1].innerText);
+    editIndex = index;
 
-        expenses -= amount;
+    expenseBtn.innerText = "Update Expense";
 
-        document.getElementById("totalExpense").innerText = expenses;
+}
 
-        updateBalance();
+function deleteExpense(index) {
 
-        row.remove();
+    if (confirm("Delete Expense?")) {
+
+        expenses.splice(index, 1);
+
+        saveData();
+
+        render();
+
+    }
+
+}
+
+search.addEventListener("keyup", render);
+
+resetBtn.onclick = () => {
+
+    if (confirm("Reset Everything?")) {
+
+        budget = 0;
+
+        expenses = [];
+
+        saveData();
+
+        render();
 
     }
 
-    // Edit
-    if(e.target.classList.contains("edit-btn")){
+};
 
-        editRow = row;
+function saveData() {
 
-        editAmount = Number(row.cells[1].innerText);
+    localStorage.setItem("budget", budget);
 
-        document.getElementById("title").value = row.cells[0].innerText;
-        document.getElementById("amount").value = row.cells[1].innerText;
+    localStorage.setItem("expenses", JSON.stringify(expenses));
 
-        expenseBtn.innerText = "Update Expense";
+}
+
+function loadData() {
+
+    budget = Number(localStorage.getItem("budget")) || 0;
+
+    expenses = JSON.parse(localStorage.getItem("expenses")) || [];
+
+    render();
+
+}
+// ===========================
+// SAVE DATA
+// ===========================
+function saveData() {
+    localStorage.setItem("budget", budget);
+    localStorage.setItem("expenses", JSON.stringify(expenses));
+}
+
+// ===========================
+// LOAD DATA
+// ===========================
+function loadData() {
+    budget = Number(localStorage.getItem("budget")) || 0;
+    expenses = JSON.parse(localStorage.getItem("expenses")) || [];
+    render();
+}
+
+// ===========================
+// EDIT EXPENSE
+// ===========================
+function editExpense(index) {
+
+    expenseTitle.value = expenses[index].title;
+    expenseAmount.value = expenses[index].amount;
+    category.value = expenses[index].category;
+
+    editIndex = index;
+
+    expenseBtn.innerHTML = "Update Expense";
+
+}
+
+// ===========================
+// DELETE EXPENSE
+// ===========================
+function deleteExpense(index) {
+
+    if(confirm("Delete this expense?")){
+
+        expenses.splice(index,1);
+
+        saveData();
+
+        render();
 
     }
+
+}
+
+// ===========================
+// SEARCH
+// ===========================
+search.addEventListener("keyup",render);
+
+// ===========================
+// RESET
+// ===========================
+resetBtn.onclick=()=>{
+
+    if(confirm("Reset All Data?")){
+
+        budget=0;
+
+        expenses=[];
+
+        editIndex=-1;
+
+        budgetText.innerHTML="Rs 0";
+        expenseText.innerHTML="Rs 0";
+        balanceText.innerHTML="Rs 0";
+
+        progressBar.style.width="0%";
+
+        warning.innerHTML="";
+
+        localStorage.clear();
+
+        render();
+
+    }
+
+};
+
+// ===========================
+// THEME TOGGLE
+// ===========================
+const themeBtn=document.getElementById("themeBtn");
+
+if(themeBtn){
+
+themeBtn.onclick=()=>{
+
+document.body.classList.toggle("light");
+
+};
+
+}
+
+// ===========================
+// DOWNLOAD CSV
+// ===========================
+const downloadBtn=document.getElementById("downloadBtn");
+
+if(downloadBtn){
+
+downloadBtn.onclick=()=>{
+
+let csv="Name,Category,Amount,Date\n";
+
+expenses.forEach(item=>{
+
+csv+=`${item.title},${item.category},${item.amount},${item.date}\n`;
 
 });
 
-function updateBalance(){
+const blob=new Blob([csv],{type:"text/csv"});
 
-    document.getElementById("balance").innerText = budget - expenses;
+const link=document.createElement("a");
 
-    if((budget - expenses) < 0){
-        document.getElementById("balance").style.color = "red";
-    }else{
-        document.getElementById("balance").style.color = "white";
-    }
+link.href=URL.createObjectURL(blob);
+
+link.download="Budget_Report.csv";
+
+link.click();
+
+};
 
 }
+
+// ===========================
+// START APP
+// ===========================
+loadData();
